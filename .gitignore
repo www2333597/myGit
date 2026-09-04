@@ -1,0 +1,20 @@
+# Keep personal study materials outside the project repository.
+**/learning/
+**/study-notes/
+**/*学习*.md
+**/*答辩*.md
+**/06_联调与交付流程.md
+**/07_资料依据与实施批次.md
+
+# Build output, editor state and private local configuration.
+**/target/
+**/.idea/
+**/*.iml
+**/*.class
+**/*.log
+**/.env
+**/.env.*
+!**/.env.example
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
