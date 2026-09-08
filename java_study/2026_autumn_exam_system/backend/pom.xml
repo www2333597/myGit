@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Maven 项目说明：依赖负责提供库，插件负责构建动作；这里不是 Spring 的 Bean XML。 -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <!-- 4.0.0 是 POM 模型版本，不是 Maven 安装版本。 -->
+  <modelVersion>4.0.0</modelVersion>
+  <!-- 父 POM 管理依赖与插件的兼容版本；空 relativePath 表示不从上层目录寻找父项目。 -->
+  <parent>
+    <groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>2.7.18</version><relativePath/>
+  </parent>
+  <!-- groupId/artifactId/version 唯一定位构建产物；默认 packaging 为 jar。 -->
+  <groupId>com.feidian</groupId><artifactId>exam-system</artifactId><version>0.1.0</version>
+  <name>exam-system</name><description>Online exam system backend</description>
+  <!-- Java 8 约束由编译插件采用；UTF-8 避免中文源码/资源随系统编码变化。 -->
+  <properties><java.version>1.8</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
+  <dependencies>
+    <!-- Web starter 带入 Spring MVC、Jackson、内嵌 Tomcat：接 HTTP、绑定 JSON、返回响应。 -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
+    <!-- 提供 Bean Validation 实现；此版本使用 javax.validation，非 Boot 3 的 jakarta.validation。 -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-validation</artifactId></dependency>
+    <!-- 仅使用 BCrypt 密码工具，没有完整 Security 过滤器链；请求保护由拦截器和 Service 实现。 -->
+    <dependency><groupId>org.springframework.security</groupId><artifactId>spring-security-crypto</artifactId></dependency>
+    <!-- 自动装配 MyBatis、SqlSessionFactory、Mapper 代理并整合 Spring JDBC 事务/数据源。 -->
+    <dependency><groupId>org.mybatis.spring.boot</groupId><artifactId>mybatis-spring-boot-starter</artifactId><version>2.3.2</version></dependency>
+    <!-- MySQL JDBC 驱动只在运行时需要；驱动版本由父 POM 管理，和服务器版本不是同一概念。 -->
+    <dependency><groupId>com.mysql</groupId><artifactId>mysql-connector-j</artifactId><scope>runtime</scope></dependency>
+    <!-- 扫描 MVC 路由/DTO 生成 OpenAPI 和 Swagger UI；描述接口不等于实现权限。 -->
+    <dependency><groupId>org.springdoc</groupId><artifactId>springdoc-openapi-ui</artifactId><version>1.8.0</version></dependency>
+    <!-- test 范围：JUnit 5、MockMvc、AssertJ 等测试工具不会作为生产运行依赖打包。 -->
+    <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-test</artifactId><scope>test</scope></dependency>
+    <!-- H2 是本项目的内存测试数据库；正式启动仍由 application.yml 连接 MySQL。 -->
+    <dependency><groupId>com.h2database</groupId><artifactId>h2</artifactId><scope>test</scope></dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <!-- package 阶段把普通 jar 重新打包为带依赖/启动器的可执行 Spring Boot jar。 -->
+      <plugin><groupId>org.springframework.boot</groupId><artifactId>spring-boot-maven-plugin</artifactId></plugin>
+      <!-- Surefire 执行测试；argLine 给测试 JVM 指定 UTF-8，而不是数据库密码或业务参数。 -->
+      <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId>
+        <configuration><argLine>-Dfile.encoding=UTF-8</argLine></configuration>
+      </plugin>
+    </plugins>
+    <testResources>
+      <!-- test profile 配置进入测试 classpath，覆盖主配置中的数据源。 -->
+      <testResource><directory>src/test/resources</directory></testResource>
+      <!-- SQL 仅复制到测试资源供隔离库初始化；不会被应用启动时自动执行。 -->
+      <testResource><directory>../database</directory><targetPath>database</targetPath></testResource>
+    </testResources>
+  </build>
+</project>

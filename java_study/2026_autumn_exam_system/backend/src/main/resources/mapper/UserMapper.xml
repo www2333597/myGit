@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 文件导读：本 XML 与同名 Mapper 接口配对；SQL 由 MyBatis 使用 JDBC 执行，Spring 管理事务连接。resultType 是每行的 Java 类型，不是 List 类型。 -->
+<mapper namespace="com.feidian.exam.mapper.UserMapper">
+  <!-- 使用 username 绑定参数查账号，包括仅供服务端核验的 password_hash；Java 层用 BCrypt.matches 判断密码。 -->
+  <select id="findByUsername" resultType="com.feidian.exam.model.User">
+    SELECT * FROM sys_user WHERE username = #{username}
+  </select>
+  <!-- 按用户主键查询完整数据库对象；向客户端返回前必须转换为 UserResponse 白名单。 -->
+  <select id="findById" resultType="com.feidian.exam.model.User">
+    SELECT * FROM sys_user WHERE id = #{id}
+  </select>
+  <!-- 只更新 real_name/gender/phone/college；#{id} 来自 Session，#{profile.xxx} 对应 @Param("profile") 的 DTO 属性。 -->
+  <update id="updateProfile">
+    UPDATE sys_user SET real_name = #{profile.realName}, gender = #{profile.gender},
+      phone = #{profile.phone}, college = #{profile.college}
+    WHERE id = #{id}
+  </update>
+</mapper>

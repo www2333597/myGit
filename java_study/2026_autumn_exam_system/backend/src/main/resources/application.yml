@@ -1,0 +1,64 @@
+# Spring Boot 主配置：缩进表示层级；${变量:默认值} 允许本机环境覆盖默认值。
+server:
+  # Tomcat 监听本机地址；这不是 MySQL 地址，也不是浏览器跨域允许名单。
+  address: ${SERVER_ADDRESS:127.0.0.1}
+  # 后端 HTTP 端口，和 MySQL 的 3306 是不同服务。
+  port: ${SERVER_PORT:8080}
+  servlet:
+    session:
+      # 会话闲置超时时长，不是考试限时；本项目尚未实现限时自动交卷。
+      timeout: 30m
+      # 只通过 Cookie 跟踪 Session，避免把会话 ID 重写到 URL 中。
+      tracking-modes: cookie
+      cookie:
+        # 阻止网页 JavaScript 直接读会话 Cookie；浏览器请求仍可自动携带它。
+        http-only: true
+        # 限制部分跨站 Cookie 发送场景；写请求仍需要服务端 CSRF Token 校验。
+        same-site: lax
+        # 本机 HTTP 演示为 false；启用 HTTPS 时可通过环境变量设为 true。
+        secure: ${SESSION_COOKIE_SECURE:false}
+  error:
+    # Boot 默认错误页面不泄露异常细节；API 另由 GlobalExceptionHandler 提供稳定 JSON。
+    include-message: never
+    include-stacktrace: never
+spring:
+  datasource:
+    # 当前本机演示库；DB_URL/DB_USERNAME 环境变量仍可在其他电脑覆盖这两个默认值。
+    # URL 中依次是 JDBC 协议、地址、端口、库名；字符集/时区参数控制驱动行为。
+    # useSSL=false 与 allowPublicKeyRetrieval=true 是本机连接配置，不是密码加密方案。
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/exam_system_fullstack?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    # 沿用用户本机 root；正式部署宜另建最小权限应用账号。
+    username: ${DB_USERNAME:root}
+    # 密码永远从本机环境/启动输入获取，不写入源码。
+    password: ${DB_PASSWORD:}
+    hikari:
+      # 连接池上限：业务借用/归还连接，避免每条 SQL 都重建 TCP 连接；不是线程池大小。
+      maximum-pool-size: 10
+  sql:
+    init:
+      # 应用启动时不自动执行 schema/seed，避免改写当前已有数据库。
+      mode: never
+  jackson:
+    deserialization:
+      # 拒绝 DTO 未定义字段，例如 role/courseId/score 注入；Controller 的 @Valid 负责字段取值。
+      fail-on-unknown-properties: true
+    # 统一日期处理设置；LocalDateTime 的 JSON 格式另由对应 DTO 的 @JsonFormat 明确指定。
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+  mvc:
+    # 让找不到处理器的情况进入 MVC 异常处理；是否匹配到静态资源也会影响 404 处理路径。
+    throw-exception-if-no-handler-found: true
+mybatis:
+  # 指定 Mapper SQL XML 的 classpath 位置；Java 接口通过 ExamApplication.@MapperScan 扫描。
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    # 例如 student_id -> studentId；别名负责解决联表显示字段，不能凭此自动推断业务关系。
+    map-underscore-to-camel-case: true
+exam:
+  cors:
+    # 协议/主机/端口共同定义 Origin；这是允许联调的来源配置，不代表本目录包含前端代码。
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+springdoc:
+  swagger-ui:
+    # 在线接口文档入口；机器可读的 OpenAPI JSON 默认仍在 /v3/api-docs。
+    path: /swagger-ui.html
