@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 文件导读：本 XML 与同名 Mapper 接口配对；SQL 由 MyBatis 使用 JDBC 执行，Spring 管理事务连接。resultType 是每行的 Java 类型，不是 List 类型。 -->
+<mapper namespace="com.feidian.exam.mapper.CourseMapper">
+  <!-- 复用课程列清单；u.real_name AS teacher_name 用别名对应 Course.teacherName，避免每条查询重复抄字段。 -->
+  <sql id="courseFields">c.id, c.name, c.teacher_id, c.description, u.real_name AS teacher_name</sql>
+  <!-- 按课程主键查询并 JOIN 教师姓名；单条返回 Course，找不到为 null，Service 决定是否抛 404。 -->
+  <select id="findById" resultType="com.feidian.exam.model.Course">
+    SELECT <include refid="courseFields"/> FROM course c JOIN sys_user u ON u.id = c.teacher_id WHERE c.id = #{id}
+  </select>
+  <!-- WHERE teacher_id 使用 Session 中的教师 ID，ORDER BY c.id 保证列表顺序稳定。 -->
+  <select id="teacherCourses" resultType="com.feidian.exam.model.Course">
+    SELECT <include refid="courseFields"/> FROM course c JOIN sys_user u ON u.id = c.teacher_id
+    WHERE c.teacher_id = #{teacherId} ORDER BY c.id
+  </select>
+  <!-- 通过 enrollment 关联学生和课程，再 JOIN 教师姓名；学生与课程是多对多关系。 -->
+  <select id="studentCourses" resultType="com.feidian.exam.model.Course">
+    SELECT <include refid="courseFields"/> FROM course c JOIN sys_user u ON u.id = c.teacher_id
+    JOIN enrollment e ON e.course_id = c.id WHERE e.student_id = #{studentId} ORDER BY c.id
+  </select>
+  <!-- COUNT 检查学生/课程组合是否存在；唯一约束保证合法数据最多 1 条，用于资源权限判断。 -->
+  <select id="isEnrolled" resultType="int">
+    SELECT COUNT(*) FROM enrollment WHERE student_id = #{studentId} AND course_id = #{courseId}
+  </select>
+  <!-- 对稳定的选课记录执行 FOR UPDATE，返回被锁行主键；必须位于 ExamService.start 的事务内，锁持有到事务结束。 -->
+  <select id="lockEnrollment" resultType="long">
+    <!-- 选课行稳定存在，适合作为“同一学生 + 同一课程”开考流程的互斥点。 -->
+    SELECT id FROM enrollment WHERE student_id = #{studentId} AND course_id = #{courseId} FOR UPDATE
+  </select>
+  <!-- 一次联表查询组装概览：CASE 优先显示进行中状态，LEFT JOIN 保留尚未考试的课程，NOT EXISTS 选择最近已交卷记录。 -->
+  <select id="studentOverview" resultType="com.feidian.exam.dto.response.StudentCourseResponse">
+    <!-- 一条 SQL 同时组装课程、进行中答卷和最近已交卷成绩，避免逐课程循环查询。 -->
+    SELECT c.id AS course_id, c.name AS course_name, u.real_name AS teacher_name,
+      CASE WHEN running.id IS NOT NULL THEN 'IN_PROGRESS'
+           WHEN latest.id IS NOT NULL THEN 'COMPLETED' ELSE 'NOT_TAKEN' END AS exam_status,
+      running.id AS active_attempt_id, latest.id AS latest_attempt_id,
+      latest.score AS latest_score, latest.total_score AS latest_total_score
+    FROM enrollment e JOIN course c ON c.id = e.course_id JOIN sys_user u ON u.id = c.teacher_id
+    LEFT JOIN exam_attempt running ON running.course_id = c.id AND running.student_id = e.student_id
+      AND running.status = 'IN_PROGRESS'
+    LEFT JOIN exam_attempt latest ON latest.course_id = c.id AND latest.student_id = e.student_id
+      <!-- 若不存在 attempt_no 更大的已交卷记录，latest 才是该学生该课程的最近一次。 -->
+      AND latest.status = 'SUBMITTED' AND NOT EXISTS (
+        SELECT 1 FROM exam_attempt newer WHERE newer.course_id = latest.course_id
+          AND newer.student_id = latest.student_id AND newer.status = 'SUBMITTED'
+          AND newer.attempt_no &gt; latest.attempt_no)
+    WHERE e.student_id = #{studentId} ORDER BY c.id
+  </select>
+</mapper>

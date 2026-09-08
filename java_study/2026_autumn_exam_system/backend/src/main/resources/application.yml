@@ -3,7 +3,7 @@ server:
   # Tomcat 监听本机地址；这不是 MySQL 地址，也不是浏览器跨域允许名单。
   address: ${SERVER_ADDRESS:127.0.0.1}
   # 后端 HTTP 端口，和 MySQL 的 3306 是不同服务。
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:3636}
   servlet:
     session:
       # 会话闲置超时时长，不是考试限时；本项目尚未实现限时自动交卷。
