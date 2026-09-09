@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 文件导读：本 XML 与同名 Mapper 接口配对；SQL 由 MyBatis 使用 JDBC 执行，Spring 管理事务连接。resultType 是每行的 Java 类型，不是 List 类型。 -->
+<mapper namespace="com.feidian.exam.mapper.QuestionMapper">
+  <!-- 所有正常查询都排除 deleted=TRUE，实现逻辑删除。 -->
+  <!-- 按题库主键查有效题目；deleted=FALSE 排除逻辑删除，教师权限由 Service 依据 courseId 再检查。 -->
+  <select id="findById" resultType="com.feidian.exam.model.Question">
+    SELECT * FROM question WHERE id = #{id} AND deleted = FALSE
+  </select>
+  <!-- 按与 list 相同的课程和删除条件计算总记录数；不应只用当前页大小作为 total。 -->
+  <select id="count" resultType="long">
+    SELECT COUNT(*) FROM question WHERE course_id = #{courseId} AND deleted = FALSE
+  </select>
+  <!-- 查询某课程有效题目的当前页；LIMIT/OFFSET 从 PageQuery 绑定，按 id 排序避免页面顺序漂移。 -->
+  <select id="list" resultType="com.feidian.exam.model.Question">
+    SELECT * FROM question WHERE course_id = #{courseId} AND deleted = FALSE
+    ORDER BY id LIMIT #{page.pageSize} OFFSET #{page.offset}
+  </select>
+  <!-- 读取课程有效题目并按 id 固定排序；最多取 1001 条让 Service 识别超出 1000 题并拒绝，而不是截断试卷。 -->
+  <select id="forExam" resultType="com.feidian.exam.model.Question">
+    <!-- 多取到 1001 条是为了让 Service 能识别“超过 1000 题”，不是把多余题静默截掉。 -->
+    SELECT * FROM question WHERE course_id = #{courseId} AND deleted = FALSE ORDER BY id LIMIT 1001
+  </select>
+  <!-- 按白名单字段新增题目并回填自增主键；courseId 来自已授权路径，时间/删除标志由数据库默认值提供。 -->
+  <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO question (course_id, stem, option_a, option_b, option_c, option_d, correct_option, points)
+    VALUES (#{courseId}, #{stem}, #{optionA}, #{optionB}, #{optionC}, #{optionD}, #{correctOption}, #{points})
+  </insert>
+  <!-- 更新题干、四选项、正确答案、分值及更新时间；沿用原题 ID/课程，并排除已删题。 -->
+  <update id="update">
+    UPDATE question SET stem=#{stem}, option_a=#{optionA}, option_b=#{optionB}, option_c=#{optionC},
+      option_d=#{optionD}, correct_option=#{correctOption}, points=#{points}, updated_at=CURRENT_TIMESTAMP
+    WHERE id=#{id} AND course_id=#{courseId} AND deleted=FALSE
+  </update>
+  <!-- HTTP DELETE 对应此逻辑删除 UPDATE；保留题库记录和历史外键，新的 forExam 查询排除该题。 -->
+  <update id="delete">
+    <!-- 不物理删题；已经生成的 exam_attempt_item 快照继续保留且外键仍有效。 -->
+    UPDATE question SET deleted=TRUE, updated_at=CURRENT_TIMESTAMP
+    WHERE id=#{id} AND course_id=#{courseId} AND deleted=FALSE
+  </update>
+</mapper>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 文件导读：本 XML 与同名 Mapper 接口配对；SQL 由 MyBatis 使用 JDBC 执行，Spring 管理事务连接。resultType 是每行的 Java 类型，不是 List 类型。 -->
+<mapper namespace="com.feidian.exam.mapper.GradeMapper">
+  <!-- sql/include 复用字段与连接条件，避免列表查询和 count 查询写出不一致的筛选规则。 -->
+  <!-- 复用成绩展示列并设置别名；student_name、attempt_id 等按驼峰映射到 GradeResponse。 -->
+  <sql id="fields">
+    a.id AS attempt_id,a.student_id,u.real_name AS student_name,u.identity_no,
+    a.course_id,c.name AS course_name,a.attempt_no,a.score,a.total_score,a.started_at,a.submitted_at
+  </sql>
+  <!-- 复用答卷与学生、课程的 JOIN；数据库对象分散在三张表，响应 DTO 在查询时组合。 -->
+  <sql id="joins">FROM exam_attempt a JOIN sys_user u ON u.id=a.student_id JOIN course c ON c.id=a.course_id</sql>
+  <!-- 只查本人课程的 SUBMITTED；NOT EXISTS 排除仍有更大 attempt_no 的记录，得到每名学生最近一次成绩。 -->
+  <sql id="latestWhere">
+    WHERE a.course_id=#{courseId} AND c.teacher_id=#{teacherId} AND a.status='SUBMITTED'
+      <!-- NOT EXISTS 保留每名学生 attempt_no 最大的已交卷记录；含义是“最近一次”，不是最高分。 -->
+      AND NOT EXISTS (SELECT 1 FROM exam_attempt newer WHERE newer.student_id=a.student_id
+        AND newer.course_id=a.course_id AND newer.status='SUBMITTED' AND newer.attempt_no &gt; a.attempt_no)
+    <!-- #{name} 仍是绑定参数；即使姓名含 SQL 符号，也不会变成可执行 SQL。 -->
+    <if test="name != null and name != ''">AND u.real_name LIKE CONCAT('%',#{name},'%')</if>
+  </sql>
+  <!-- 复用统一字段、JOIN、筛选，按提交时间和主键倒序分页；不是按 score 排序选最高分。 -->
+  <select id="latest" resultType="com.feidian.exam.dto.response.GradeResponse">
+    SELECT <include refid="fields"/> <include refid="joins"/> <include refid="latestWhere"/>
+    ORDER BY a.submitted_at DESC,a.id DESC LIMIT #{page.pageSize} OFFSET #{page.offset}
+  </select>
+  <!-- 与 latest 使用同一 latestWhere 片段，保证分页总数对应筛选后的最新成绩人数。 -->
+  <select id="countLatest" resultType="long">
+    SELECT COUNT(*) <include refid="joins"/> <include refid="latestWhere"/>
+  </select>
+  <!-- 只查询指定学生在课程内全部已交卷记录，按 attempt_no 倒序；Service 已确认访问权限。 -->
+  <select id="history" resultType="com.feidian.exam.dto.response.GradeResponse">
+    SELECT <include refid="fields"/> <include refid="joins"/>
+    WHERE a.student_id=#{studentId} AND a.course_id=#{courseId} AND a.status='SUBMITTED'
+    ORDER BY a.attempt_no DESC LIMIT #{page.pageSize} OFFSET #{page.offset}
+  </select>
+  <!-- 统计相同学生/课程的已交卷记录总数；不包含正在重考但未交卷的记录。 -->
+  <select id="countHistory" resultType="long">
+    SELECT COUNT(*) FROM exam_attempt
+    WHERE student_id=#{studentId} AND course_id=#{courseId} AND status='SUBMITTED'
+  </select>
+</mapper>
