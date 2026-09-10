@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- 文件导读：本 XML 与同名 Mapper 接口配对；SQL 由 MyBatis 使用 JDBC 执行，Spring 管理事务连接。resultType 是每行的 Java 类型，不是 List 类型。 -->
+<mapper namespace="com.feidian.exam.mapper.ExamMapper">
+  <!-- #{...} 使用预编译参数绑定，不是字符串拼接；参数来自同名 Mapper 方法。 -->
+  <!-- 查询学生在课程中 IN_PROGRESS 答卷，用于重复开考时复用；调用前已经锁定该选课记录。 -->
+  <select id="active" resultType="com.feidian.exam.model.Attempt">
+    SELECT a.*, c.name AS course_name FROM exam_attempt a JOIN course c ON c.id=a.course_id
+    WHERE a.student_id=#{studentId} AND a.course_id=#{courseId} AND a.status='IN_PROGRESS'
+  </select>
+  <!-- MAX 取得最大考试序号；没有记录时聚合为 null，COALESCE 转为 0，业务层再加 1。 -->
+  <select id="lastAttemptNo" resultType="int">
+    SELECT COALESCE(MAX(attempt_no),0) FROM exam_attempt WHERE student_id=#{studentId} AND course_id=#{courseId}
+  </select>
+  <!-- 插入答卷头；useGeneratedKeys/keyProperty 从 JDBC 获取 MySQL 自增主键并写回 Attempt.id，不是 insert 方法返回 ID。 -->
+  <insert id="insertAttempt" useGeneratedKeys="true" keyProperty="id">
+    <!-- useGeneratedKeys 将 AUTO_INCREMENT 生成的值回填到 Attempt.id。 -->
+    INSERT INTO exam_attempt (student_id,course_id,attempt_no,status,total_score,started_at)
+    VALUES (#{studentId},#{courseId},#{attemptNo},#{status},#{totalScore},#{startedAt})
+  </insert>
+  <!-- 插入本次试题快照与来源 ID；题干、四选项、正确答案、分值共同冻结，和卷头在一个事务内保存。 -->
+  <insert id="insertItem" useGeneratedKeys="true" keyProperty="id">
+    INSERT INTO exam_attempt_item (attempt_id,source_question_id,position_no,stem_snapshot,
+      option_a_snapshot,option_b_snapshot,option_c_snapshot,option_d_snapshot,correct_option_snapshot,points_snapshot)
+    VALUES (#{attemptId},#{sourceQuestionId},#{positionNo},#{stemSnapshot},
+      #{optionASnapshot},#{optionBSnapshot},#{optionCSnapshot},#{optionDSnapshot},#{correctOptionSnapshot},#{pointsSnapshot})
+  </insert>
+  <!-- 同时按答卷 ID 和会话学生 ID 查询，JOIN 课程名称用于响应；避免先查询任意卷再忘记检查归属。 -->
+  <select id="findOwned" resultType="com.feidian.exam.model.Attempt">
+    SELECT a.*, c.name AS course_name FROM exam_attempt a JOIN course c ON c.id=a.course_id
+    WHERE a.id=#{id} AND a.student_id=#{studentId}
+  </select>
+  <!-- 按答卷主键及所有者执行锁定读 FOR UPDATE，让同卷提交串行化；后来的事务可看到已提交状态。 -->
+  <select id="lockOwned" resultType="com.feidian.exam.model.Attempt">
+    <!-- 行锁持续到事务结束，使同一答卷的并发提交按顺序执行。student_id 同时限制资源归属。 -->
+    SELECT * FROM exam_attempt WHERE id=#{id} AND student_id=#{studentId} FOR UPDATE
+  </select>
+  <!-- 按答卷 ID 查询全部快照，ORDER BY position_no 保证卷面顺序；学生响应会在 Service 中过滤正确答案字段。 -->
+  <select id="items" resultType="com.feidian.exam.model.AttemptItem">
+    SELECT * FROM exam_attempt_item WHERE attempt_id=#{attemptId} ORDER BY position_no
+  </select>
+  <!-- UPDATE 一道明细的学生选项及得分；同时限制 id/attempt_id，返回影响行数供事务校验。 -->
+  <update id="saveAnswer">
+    UPDATE exam_attempt_item SET chosen_option=#{chosenOption}, earned_points=#{earnedPoints}
+    WHERE id=#{id} AND attempt_id=#{attemptId}
+  </update>
+  <!-- 一次更新总分、SUBMITTED 状态和提交时间；WHERE 还要求原状态 IN_PROGRESS，保护合法状态迁移。 -->
+  <update id="submit">
+    <!-- status 条件是一道额外保护；若更新行数不是 1，Service 会抛异常并整体回滚。 -->
+    UPDATE exam_attempt SET score=#{score},status='SUBMITTED',submitted_at=#{submittedAt}
+    WHERE id=#{id} AND student_id=#{studentId} AND status='IN_PROGRESS'
+  </update>
+</mapper>
