@@ -1,0 +1,20 @@
+# 由 @ActiveProfiles("test") 激活；测试配置覆盖主数据源，但仍复用相同业务 Bean/Mapper。
+spring:
+  datasource:
+    # mem 是内存库；MODE=MySQL 兼容常用 SQL，并不证明所有 MySQL 行为完全等价。
+    # DB_CLOSE_DELAY=-1 在同一 JVM 中保留库直到退出；LOCK_TIMEOUT=10000 限制等锁时间。
+    url: ${TEST_DB_URL:jdbc:h2:mem:exam_tests;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000}
+    # 仅测试账号与密码；不要把当前业务库连接信息赋给 TEST_DB_*。
+    username: ${TEST_DB_USERNAME:sa}
+    password: ${TEST_DB_PASSWORD:}
+  sql:
+    init:
+      # 初始化由测试类先核验实际库名再执行，不能绕过保护自动导入 SQL。
+      mode: never
+logging:
+  level:
+    # 减少测试噪声；事务故障注入仍会有一条预期 ERROR，最终以断言/报告为准。
+    root: WARN
+test:
+  # 默认不允许 MySQL 测试清数据；即使开启，也必须满足本机 exam_system_test 的代码保护。
+  allow-database-reset: ${ALLOW_TEST_DB_RESET:false}
