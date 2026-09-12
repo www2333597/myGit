@@ -1,0 +1,32 @@
+{
+  "transport" : "Spring MockMvc",
+  "database" : "MySQL",
+  "verifiedAt" : "2026-09-04T22:10:41.864+08:00",
+  "method" : "POST",
+  "path" : "/api/student/attempts/27/submit",
+  "requestBody" : {
+    "answers" : [ {
+      "itemId" : 51,
+      "selectedOption" : "A"
+    }, {
+      "itemId" : 52,
+      "selectedOption" : "B"
+    } ]
+  },
+  "status" : 200,
+  "responseBody" : {
+    "code" : "OK",
+    "message" : "成功",
+    "data" : {
+      "attemptId" : 27,
+      "courseId" : 1,
+      "attemptNo" : 1,
+      "score" : 30,
+      "totalScore" : 30,
+      "courseName" : "Java 基础",
+      "status" : "SUBMITTED",
+      "startedAt" : "2026-09-04 22:10:41",
+      "submittedAt" : "2026-09-04 22:10:41"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "transport" : "Spring MockMvc",
+  "database" : "MySQL",
+  "verifiedAt" : "2026-09-04T22:10:40.826+08:00",
+  "method" : "POST",
+  "path" : "/api/student/courses/1/attempts",
+  "requestBody" : "{broken",
+  "status" : 400,
+  "responseBody" : {
+    "code" : "INVALID_INPUT",
+    "message" : "请求字段、格式或取值不正确",
+    "data" : null
+  }
+}

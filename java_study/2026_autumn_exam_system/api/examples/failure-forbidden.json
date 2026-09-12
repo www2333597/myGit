@@ -1,0 +1,14 @@
+{
+  "transport" : "Spring MockMvc",
+  "database" : "MySQL",
+  "verifiedAt" : "2026-09-04T22:10:41.773+08:00",
+  "method" : "GET",
+  "path" : "/api/teacher/courses",
+  "requestBody" : null,
+  "status" : 403,
+  "responseBody" : {
+    "code" : "FORBIDDEN",
+    "message" : "没有访问权限",
+    "data" : null
+  }
+}
